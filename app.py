@@ -14,7 +14,7 @@ st.title("🎓 Student Performance Predictor")
 st.write("Predict student performance and understand influencing factors")
 
 # ==============================
-# CACHE MODEL & SCALER
+# LOAD MODEL (CACHED)
 # ==============================
 @st.cache_resource
 def load_model():
@@ -25,11 +25,11 @@ def load_model():
 model, scaler = load_model()
 
 # ==============================
-# CACHE SHAP EXPLAINER
+# FIXED SHAP EXPLAINER (NO ERROR)
 # ==============================
 @st.cache_resource
-def get_explainer(model):
-    return shap.Explainer(model)
+def get_explainer(_model):   # 👈 underscore fixes error
+    return shap.Explainer(_model)
 
 explainer = get_explainer(model)
 
@@ -56,19 +56,19 @@ if submit:
     with st.spinner("Processing..."):
 
         # Encoding
-        gender = 1 if gender == "Male" else 0
-        activities = 1 if activities == "Yes" else 0
+        gender_val = 1 if gender == "Male" else 0
+        activities_val = 1 if activities == "Yes" else 0
         parent_map = {"Low": 0, "Medium": 1, "High": 2}
-        parent_support = parent_map[parent_support]
+        parent_val = parent_map[parent_support]
 
-        # Input dataframe
+        # Create DataFrame
         input_data = pd.DataFrame([[
-            gender,
+            gender_val,
             attendance,
             study_hours,
             previous_grade,
-            activities,
-            parent_support,
+            activities_val,
+            parent_val,
             online_classes
         ]], columns=[
             "Gender",
@@ -86,11 +86,11 @@ if submit:
         # Scale
         scaled_data = scaler.transform(input_data)
 
-        # Prediction
+        # Predict
         prediction = model.predict(scaled_data)[0]
         probability = model.predict_proba(scaled_data)
 
-        # Label mapping
+        # Labels
         label_map = {0: "Low", 1: "Medium", 2: "High"}
         result = label_map.get(prediction, str(prediction))
 
@@ -114,16 +114,18 @@ if submit:
     st.write(prob_dict)
 
     # ==============================
-    # SHAP (OPTIONAL BUTTON)
+    # SHAP (OPTIONAL)
     # ==============================
     if st.checkbox("🧠 Show Model Explanation (SHAP)"):
 
         try:
-            shap_values = explainer(scaled_data)
+            with st.spinner("Generating explanation..."):
 
-            fig = plt.figure()
-            shap.plots.waterfall(shap_values[0], show=False)
-            st.pyplot(fig, clear_figure=True)
+                shap_values = explainer(scaled_data)
+
+                fig = plt.figure()
+                shap.plots.waterfall(shap_values[0], show=False)
+                st.pyplot(fig, clear_figure=True)
 
         except Exception:
             st.warning("SHAP explanation not available for this model.")
