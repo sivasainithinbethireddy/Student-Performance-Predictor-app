@@ -1,20 +1,9 @@
-# Core Libraries
-numpy
+streamlit
 pandas
-
-# Visualization
+numpy
+scikit-learn
 matplotlib
 seaborn
-
-# Machine Learning
-scikit-learn
-imbalanced-learn
 xgboost
-# Explainable AI
 shap
-
-# Web App (Streamlit)
-streamlit
-
-# Model Saving
 joblib
