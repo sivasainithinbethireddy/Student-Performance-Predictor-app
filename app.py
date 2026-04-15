@@ -6,15 +6,7 @@ import shap
 import matplotlib.pyplot as plt
 
 # ==============================
-# PAGE CONFIG
-# ==============================
-st.set_page_config(page_title="Student Performance Predictor", layout="centered")
-
-st.title("🎓 Student Performance Predictor")
-st.write("Predict student performance and understand influencing factors")
-
-# ==============================
-# LOAD MODEL (CACHED)
+# LOAD MODEL (FIXED - CACHED)
 # ==============================
 @st.cache_resource
 def load_model():
@@ -25,16 +17,15 @@ def load_model():
 model, scaler = load_model()
 
 # ==============================
-# FIXED SHAP EXPLAINER (NO ERROR)
+# PAGE CONFIG
 # ==============================
-@st.cache_resource
-def get_explainer(_model):   # 👈 underscore fixes error
-    return shap.Explainer(_model)
+st.set_page_config(page_title="Student Performance Predictor", layout="centered")
 
-explainer = get_explainer(model)
+st.title("🎓 Student Performance Predictor")
+st.write("Predict student performance and understand influencing factors")
 
 # ==============================
-# FORM (PREVENTS AUTO RELOAD)
+# USER INPUTS (FIXED USING FORM)
 # ==============================
 with st.form("prediction_form"):
 
@@ -49,58 +40,59 @@ with st.form("prediction_form"):
     submit = st.form_submit_button("🔍 Predict Performance")
 
 # ==============================
+# ENCODING
+# ==============================
+gender_val = 1 if gender == "Male" else 0
+activities_val = 1 if activities == "Yes" else 0
+parent_map = {"Low": 0, "Medium": 1, "High": 2}
+parent_val = parent_map[parent_support]
+
+# ==============================
+# CREATE INPUT DATA
+# ==============================
+input_data = pd.DataFrame([[
+    gender_val,
+    attendance,
+    study_hours,
+    previous_grade,
+    activities_val,
+    parent_val,
+    online_classes
+]], columns=[
+    "Gender",
+    "Attendance",
+    "StudyHours",
+    "PreviousGrade",
+    "ExtracurricularActivities",
+    "ParentalSupport",
+    "Online Classes Taken"
+])
+
+# Match training feature order
+input_data = input_data[scaler.feature_names_in_]
+
+# ==============================
 # PREDICTION
 # ==============================
 if submit:
 
-    with st.spinner("Processing..."):
+    # Scale input
+    scaled_data = scaler.transform(input_data)
 
-        # Encoding
-        gender_val = 1 if gender == "Male" else 0
-        activities_val = 1 if activities == "Yes" else 0
-        parent_map = {"Low": 0, "Medium": 1, "High": 2}
-        parent_val = parent_map[parent_support]
+    # Prediction
+    prediction = model.predict(scaled_data)[0]
+    probability = model.predict_proba(scaled_data)
 
-        # Create DataFrame
-        input_data = pd.DataFrame([[
-            gender_val,
-            attendance,
-            study_hours,
-            previous_grade,
-            activities_val,
-            parent_val,
-            online_classes
-        ]], columns=[
-            "Gender",
-            "Attendance",
-            "StudyHours",
-            "PreviousGrade",
-            "ExtracurricularActivities",
-            "ParentalSupport",
-            "Online Classes Taken"
-        ])
+    # Label mapping
+    label_map = {0: "Low", 1: "Medium", 2: "High"}
+    result = label_map.get(prediction, str(prediction))
 
-        # Match training feature order
-        input_data = input_data[scaler.feature_names_in_]
-
-        # Scale
-        scaled_data = scaler.transform(input_data)
-
-        # Predict
-        prediction = model.predict(scaled_data)[0]
-        probability = model.predict_proba(scaled_data)
-
-        # Labels
-        label_map = {0: "Low", 1: "Medium", 2: "High"}
-        result = label_map.get(prediction, str(prediction))
-
-    # ==============================
-    # OUTPUT
-    # ==============================
     st.subheader("📊 Prediction Result")
     st.success(f"Performance Level: {result}")
 
-    # Probability
+    # ==============================
+    # PROBABILITY
+    # ==============================
     st.write("### 🔢 Prediction Probability")
 
     classes = model.classes_
@@ -114,18 +106,17 @@ if submit:
     st.write(prob_dict)
 
     # ==============================
-    # SHAP (OPTIONAL)
+    # SHAP (UNCHANGED - AS OLD)
     # ==============================
-    if st.checkbox("🧠 Show Model Explanation (SHAP)"):
+    st.subheader("🧠 Model Explanation (SHAP)")
 
-        try:
-            with st.spinner("Generating explanation..."):
+    try:
+        explainer = shap.Explainer(model, scaled_data)
+        shap_values = explainer(scaled_data)
 
-                shap_values = explainer(scaled_data)
+        fig = plt.figure()
+        shap.plots.waterfall(shap_values[0], show=False)
+        st.pyplot(fig, clear_figure=True)
 
-                fig = plt.figure()
-                shap.plots.waterfall(shap_values[0], show=False)
-                st.pyplot(fig, clear_figure=True)
-
-        except Exception:
-            st.warning("SHAP explanation not available for this model.")
+    except Exception:
+        st.warning("SHAP explanation not available for this model.")
